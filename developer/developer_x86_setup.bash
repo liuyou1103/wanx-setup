@@ -125,6 +125,7 @@ else
     # 将当前用户加入 docker 组（避免每次使用 sudo）
     echo "将用户 $USER 加入 docker 组..."
     sudo usermod -aG docker "$USER"
+	echo "正在刷新组权限，部分系统需要重启终端，再次运行该脚本"
     newgrp docker || true  # 刷新组权限（部分系统可能需要重启终端）
 
     # 验证安装（即使已安装也要运行验证）
@@ -178,17 +179,49 @@ sudo nginx -t || die "Nginx 配置测试失败，请检查 /etc/nginx/conf.d/ �
 sudo systemctl reload nginx || die "Nginx 重载失败"
 
 # 配置 logtail
-sudo mkdir -p /opt/wanx_studio/
-sudo chown -R $USER:$USER /opt/wanx_studio/
-sudo chmod -R 777 /opt/wanx_studio/
-
-sudo mkdir -p /etc/ilogtail/users
-sudo touch /etc/ilogtail/users/1560822971114422
-echo "robot-baai-any" | sudo tee /etc/ilogtail/user_defined_id > /dev/null
-
-wget http://aliyun-observability-release-cn-beijing.oss-cn-beijing.aliyuncs.com/loongcollector/linux64/latest/loongcollector.sh -O loongcollector.sh
-chmod 755 loongcollector.sh
-sudo ./loongcollector.sh install cn-beijing-internet
+LOGTAIL_DIR="/usr/local/ilogtail"
+APP_INFO_FILE="${LOGTAIL_DIR}/app_info.json"
+ 
+# 检查 Logtail 是否已安装（通过 app_info.json 是否存在且包含版本信息）
+if [ -f "$APP_INFO_FILE" ] && grep -q "loongcollector_version" "$APP_INFO_FILE"; then
+    echo "Logtail 已安装，版本信息："
+    sudo cat "$APP_INFO_FILE" | grep "loongcollector_version"
+    # 其他后续操作...
+else
+    echo "Logtail 未安装，开始配置和安装..."
+ 
+    # 配置目录权限
+    sudo mkdir -p /opt/wanx_studio/
+    sudo chown -R "$USER":"$USER" /opt/wanx_studio/
+    sudo chmod -R 777 /opt/wanx_studio/
+ 
+    # 创建 Logtail 用户标识文件
+    sudo mkdir -p /etc/ilogtail/users
+    sudo touch /etc/ilogtail/users/1560822971114422
+    echo "robot-baai-any" | sudo tee /etc/ilogtail/user_defined_id > /dev/null
+ 
+    # 下载并安装 Logtail
+    LOGTAIL_SCRIPT="loongcollector.sh"
+    if [ ! -f "$LOGTAIL_SCRIPT" ]; then
+        echo "下载 Logtail 安装脚本..."
+        wget http://aliyun-observability-release-cn-beijing.oss-cn-beijing.aliyuncs.com/loongcollector/linux64/latest/loongcollector.sh -O "$LOGTAIL_SCRIPT"
+        chmod 755 "$LOGTAIL_SCRIPT"
+    else
+        echo "检测到已下载的安装脚本，跳过下载。"
+    fi
+ 
+    echo "安装 Logtail..."
+    sudo ./"$LOGTAIL_SCRIPT" install cn-beijing-internet
+ 
+    # 再次检查安装结果
+    if [ -f "$APP_INFO_FILE" ] && grep -q "loongcollector_version" "$APP_INFO_FILE"; then
+        echo "Logtail 安装成功！版本信息："
+        sudo cat "$APP_INFO_FILE" | grep "loongcollector_version"
+    else
+        echo "错误：Logtail 安装失败，未找到版本信息文件！"
+        exit 1
+    fi
+fi
 
 # ====================== 步骤6: 部署代码 ======================
 echo "步骤6: 部署代码..."
