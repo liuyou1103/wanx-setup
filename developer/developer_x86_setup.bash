@@ -7,7 +7,6 @@ die() {
 }
 # ====================== 初始配置 ======================
 echo "请注意！！！该安装程序为开发者使用，适配 x86架构，安装采集平台所需的软件、服务"
-echo "请注意！！！如果使用docker启动端侧服务，请手动拷贝端侧镜像baai-server-x86.tar"
 read -p "按回车键继续..."
 # 预定义的机器人类型列表（可根据实际情况扩展）
 KNOWN_ROBOT_TYPES=("aloha" "pika" "realman" "dexterous_hand" "so101" "galaxea" "galbot")
@@ -244,36 +243,71 @@ fi
 # ====================== 步骤7: 加载 Docker 镜像 ======================
 echo "步骤7: 加载 Docker 镜像..."
 
- 
 for img in "${DOCKER_IMAGES[@]}"; do
     img_name=$(basename "$img" .tar)
+    load_image="n"  # 默认跳过
 
-    # 统一询问
+    # 询问是否加载本地镜像
     while true; do
-        read -p "是否加载镜像 ${img_name}？(y/n) " load_image
+        read -p "是否加载本地镜像 ${img_name}？(y/n) " load_image
         case "$load_image" in
-            y|Y) break ;;
-            n|N) echo "跳过加载镜像 ${img_name}"; continue 2 ;;
-            *)   echo "请输入 y 或 n" ;;
+            y|Y) 
+                # 检查文件是否存在
+                if [[ ! -f "$SCRIPT_DIR/$img" ]]; then
+                    echo "警告：镜像文件 $SCRIPT_DIR/$img 不存在，跳过"
+                    continue 2
+                fi
+                # 加载本地镜像
+                echo "正在加载本地镜像 $img_name ..."
+                if sudo docker load -i "$SCRIPT_DIR/$img"; then
+                    echo "成功加载镜像 $img_name"
+                else
+                    echo "错误：加载镜像 $img_name 失败"
+                    exit 1
+                fi
+                break
+                ;;
+            n|N) 
+                echo "跳过本地镜像 ${img_name}"
+                # 修改：使用指定的 Docker Hub 拉取 + 重命名逻辑
+                while true; do
+                    read -p "是否从 Docker Hub 拉取镜像 ${img_name}？(y/n) " pull_image
+                    case "$pull_image" in
+                        y|Y)
+                            echo "正在拉取镜像 liuyou1103/wanx-server:tag ..."
+                            if sudo docker pull "liuyou1103/wanx-server:tag"; then
+                                echo "成功拉取镜像 liuyou1103/wanx-server:tag"
+                                # 重命名为本地需要的镜像名
+                                echo "正在重命名为 ${img_name}:latest ..."
+                                if sudo docker tag "liuyou1103/wanx-server:tag" "${img_name}:latest"; then
+                                    echo "成功重命名为 ${img_name}:latest"
+                                else
+                                    echo "错误：重命名镜像失败"
+                                    exit 1
+                                fi
+                            else
+                                echo "错误：拉取镜像 liuyou1103/wanx-server:tag 失败"
+                                exit 1
+                            fi
+                            break 2  # 跳出两层循环
+                            ;;
+                        n|N) 
+                            echo "跳过镜像 ${img_name}（后续可能影响服务启动）"
+                            continue 3  # 跳出两层循环，处理下一个镜像
+                            ;;
+                        *) 
+                            echo "请输入 y 或 n" 
+                            ;;
+                    esac
+                done
+                break
+                ;;
+            *) 
+                echo "请输入 y 或 n" 
+                ;;
         esac
     done
-
-    # 文件存在性检查
-    if [[ ! -f "$SCRIPT_DIR/$img" ]]; then
-        echo "警告：镜像文件 $SCRIPT_DIR/$img 不存在，跳过"
-        continue
-    fi
-
-    # 加载镜像
-    echo "正在加载镜像 $img_name ..."
-    if sudo docker load -i "$SCRIPT_DIR/$img"; then
-        echo "成功加载镜像 $img_name"
-    else
-        echo "错误：加载镜像 $img_name 失败"
-        exit 1
-    fi
 done
-
 # ====================== 步骤8: 配置免密 sudo ======================
 echo "步骤8: 配置免密 sudo..."
 echo "$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/ip, /sbin/modprobe, /usr/sbin/ethtool" | sudo tee "/etc/sudoers.d/baai_nopasswd_$CURRENT_USER" >/dev/null
