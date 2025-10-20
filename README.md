@@ -7,7 +7,7 @@
 ## 📁 仓库目录结构
 
 ```bash
-├── developer_x86/          # 开发者专用脚本和配置
+├── developer/          # 开发者专用脚本和配置
 │   ├── baai_server_ceshi.conf    # 测试环境服务器配置
 │   ├── baai_server_release.conf # 生产环境服务器配置
 │   └── developer_x86_setup.bash # 开发者版 x86 架构一键安装脚本
@@ -18,7 +18,7 @@
 ## 🛠️ 开发者安装指南-x86
 ```bash
 git clone git@github.com:liuyou1103/wanx-setup.git
-cd wanx-setup/developer_x86
+cd wanx-setup/developer/
 ./developer_x86_setup.bash
 ```
 ## 🛠️ 开发者切换服务版本指南-x86
@@ -40,4 +40,5 @@ sudo gedit setup.yaml
 # 4. 重启容器使配置生效
 sudo docker restart baai_flask_server
 ```
+
 
