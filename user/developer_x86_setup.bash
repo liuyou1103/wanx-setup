@@ -50,7 +50,7 @@ cd "$SCRIPT_DIR" || die "无法进入脚本目录"
 # 定义变量
 BACKEND_REPO="https://github.com/BAAI-EI-DATA/WanX-Studio-Server.git"
 DOCKER_IMAGES=("baai-server-x86.tar")
-NGINX_CONFS=("baai_server_ceshi.conf" "baai_server_release.conf")
+NGINX_CONFS=("baai_server_release.conf")
 
 # 检查必需文件是否存在
 REQUIRED_FILES=("${NGINX_CONFS[@]}")
